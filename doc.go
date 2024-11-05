@@ -1,34 +1,60 @@
+/*
+Package uid ...
+
+UUID V7 uses Method 3 (Replace Leftmost Random Bits with Increased Clock Precision) to implement single-node
+monotonicity.
+*/
 package uid
 
-import (
-	crand "crypto/rand"
-	"math/rand/v2"
-	"time"
-)
+// MaxCanonical is the canonical RFC9562 "Max" UUID.
+const MaxCanonical = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
-// ref
-const (
-	// well-known strings
-	MaxCanonical = "ffffffff-ffff-ffff-ffff-ffffffffffff" // case insensitive
-	MaxCompact32 = "P777777777777777777777777P"           // case insensitive
-	MaxCompact64 = "P____________________P"               // case sensitive
-	NilCanonical = "00000000-0000-0000-0000-000000000000"
-	NilCompact32 = "AAAAAAAAAAAAAAAAAAAAAAAAAA" // case insensitive
-	NilCompact64 = "AAAAAAAAAAAAAAAAAAAAAA"     // case sensitive
-	// versions
-	VersionNil = uint8(0)
-	Version4   = uint8(4)
-	Version7   = uint8(7)
-	VersionMax = uint8(15)
-	// variants
-	Variant9562 = uint8(2)
-)
+// MaxCompact32 is the canonical NCName Compact Base32 "Max" UUID.
+const MaxCompact32 = "P777777777777777777777777P"
 
-// wtb const arrays
+// MaxCompact64 is the canonical NCName Compact Base64 "Max" UUID.
+const MaxCompact64 = "P____________________P"
+
+// MaxJSON is the canonical JSON "Max" UUID.
+const MaxJSON = `"ffffffff-ffff-ffff-ffff-ffffffffffff"`
+
+// NilCanonical is the canonical RFC9562 "Nil" UUID.
+const NilCanonical = "00000000-0000-0000-0000-000000000000"
+
+// NilCompact32 is the canonical NCName Compact Base32 "Nil" UUID.
+const NilCompact32 = "AAAAAAAAAAAAAAAAAAAAAAAAAA"
+
+// NilCompact64 is the canonical NCName Compact Base64 "Nil" UUID.
+const NilCompact64 = "AAAAAAAAAAAAAAAAAAAAAA"
+
+// NilJSON is the canonical JSON "Nil" UUID.
+const NilJSON = `"00000000-0000-0000-0000-000000000000"`
+
+// VersionNil is the Nil UUID version.
+const VersionNil = Version(0) // 0x0
+
+// Version4 is the version of random UUIDs.
+const Version4 = Version(4) // 0x4
+
+// Version7 is the version of time-sortable UUIDs.
+const Version7 = Version(7) // 0x7
+
+// VersionMax is the Max UUID version.
+const VersionMax = Version(15) // 0xf
+
+// Variant9562 is the variant that RFC9562 defines for the types therein.
+const Variant9562 = uint8(2) // 0x2
+
+// Version is the RFC9562 UUID Version.
+type Version uint8
+
+//nolint:gochecknoglobals // wtb const builtins
 var (
-	bytesNil            = [16]byte{}
-	bytesMax            = [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-	versionsNCNameTable = map[rune]uint8{
+	bytesNil = [16]byte{}
+	bytesMax = [16]byte{
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	}
+	versionsNCNameTable = map[rune]Version{
 		'A': VersionNil, // nil
 		// 'B': 1, // v1 not supported yet
 		// 'C': 2, // v2 not supported yet
@@ -40,18 +66,7 @@ var (
 		// 'I': 8, // v8 not supported yet
 		'P': VersionMax, // max
 	}
-)
-
-// pkg runtime
-var rng *rand.ChaCha8 // manipulatable via functions in export_test
-var now = time.Now    // manipulatable via functions in export_test
-
-// use crypto/rand to initialize the ChaCha8 generator
-func init() {
-	var seed [32]byte
-	n, err := crand.Read(seed[:])
-	if err != nil || n != 32 {
-		panic("unable to initialize seed from crypto/rand")
+	versionCanonicalTable = map[byte]Version{
+		'0': VersionNil, '4': Version4, '7': Version7, 'f': VersionMax, 'F': VersionMax,
 	}
-	rng = rand.NewChaCha8(seed)
-}
+)

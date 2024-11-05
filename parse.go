@@ -5,104 +5,150 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"strings"
 	"unicode"
 )
 
-var b32decoder = base32.StdEncoding.WithPadding(base32.NoPadding)
-
-func Parse[T string | []rune | []byte | [16]byte](src T) (id UUID, err error) {
-	b := &id.b
-	switch t := any(src).(type) {
-	case string, []byte, []rune:
-		err = parseString(b, t.(string))
-	case [16]byte:
-		// err = parseArray(b, t)
-		// case []byte, []rune:
-		// 	err = parseSlice(b, t)
-	}
-	return id, err
-}
-
-func parseString(tgt *[16]byte, src string) error {
+// Parse attempts to parse `src` into a UUID and returns the parsed UUID and `true` on success.
+// On failure, Parse returns the Nil UUID and `false`.
+//
+//nolint:mnd // locality of behavior
+func Parse(src string) (UUID, error) {
+	out := UUID{}
+	var err error
 	switch len(src) {
-	case 26: // compact32
-		return parseCompact32(tgt, src)
-	case 22: // compact64
-		return parseCompact64(tgt, src)
-	case 36: // canonical
-		return parseCanon(tgt, src)
-	case 45: // urn
-		return parseCanon(tgt, src[9:]) // strip off urn:uuid:
+	case 36:
+		err = parseCanonical(&out.b, src)
+	case 16: // raw [16]byte slice
+		copy(out.b[:], []byte(src))
+	case 26:
+		err = parseCompact32(&out.b, src)
+	case 22:
+		err = parseCompact64(&out.b, src)
+		// case 45: // urn not yet supported
+		// 	err = parseCanon(b, src[9:]) // strip off urn:uuid:
+	default:
+		return out, ParseError{}
 	}
-	return errors.New("unrecognized UUID format or version")
+	if err != nil {
+		out.b = bytesNil
+	}
+	return out, err
 }
 
-// func parseSlice(tgt *[16]byte, src []byte) error {
-// 	const rawlen = 16
-// 	if len(src) == rawlen {
-// 		var a [rawlen]byte
-// 		copy(a[:], src[:rawlen])
-// 		return parseArray(tgt, a)
-// 	}
-// 	// if it's not 16 bytes, it's a string form
-// 	return parseString(tgt, string(src))
-// }
-
-// func parseArray(tgt *[16]byte, src [16]byte) error {
-// 	*tgt = src
-// 	return nil
-// }
-
-func parseCanon(tgt *[16]byte, src string) error {
-	if _, err := hex.Decode((*tgt)[:], []byte(strings.ReplaceAll(src, "-", ""))); err != nil {
+// Must is a helper to wrap the parser in a panic-on-error handler. Useful for testing.
+func Must(u UUID, err error) UUID {
+	if err != nil {
 		panic(err)
 	}
-	return nil
+	return u
 }
 
-func parseCompact32(tgt *[16]byte, src string) error {
-	src = strings.ToUpper(src) // canonicalize
-	version, ok := versionsNCNameTable[rune(src[0])]
+func parseCanonical(tgt *[16]byte, src string) error {
+	v, ok := versionCanonicalTable[src[14]]
 	if !ok {
-		panic("fix this")
+		return ParseError{}
 	}
-	pad := "A"
-	if version == VersionMax {
-		pad = "P"
+	// s/c nil
+	if v == VersionNil {
+		if src != NilCanonical {
+			return ParseError{}
+		}
+		*tgt = bytesNil
+		return nil
 	}
-	src += pad
-	_, err := b32decoder.Decode((*tgt)[:], []byte(src)[1:])
+	// s/c max
+	if v == VersionMax {
+		if src != MaxCanonical {
+			return ParseError{}
+		}
+		*tgt = bytesMax
+		return nil
+	}
+	// not Nil or Max, decode without dashes.
+	if _, err := hex.Decode((*tgt)[:], []byte(strings.ReplaceAll(src, "-", ""))); err != nil {
+		return ParseError{err}
+	}
+	return checkVariant(tgt)
+}
+
+//nolint:gochecknoglobals // shared locality of behavior
+var b32decoder = base32.StdEncoding.WithPadding(base32.NoPadding)
+
+func parseCompact32(tgt *[16]byte, src string) error {
+	src = strings.ToUpper(src)
+	v, ok := versionsNCNameTable[rune(src[0])]
+	if !ok {
+		// unsupported version
+		return ParseError{}
+	}
+	// s/c nil
+	if v == VersionNil {
+		if src != NilCompact32 {
+			return ParseError{}
+		}
+		*tgt = bytesNil
+		return nil
+	}
+	// s/c max
+	if v == VersionMax {
+		if src != MaxCompact32 {
+			return ParseError{}
+		}
+		*tgt = bytesMax
+		return nil
+	}
+	// not Nil or Max, decode with padding v4/v7
+	_, err := b32decoder.Decode((*tgt)[:], []byte(src + "A")[1:])
 	if err != nil {
-		panic(src[1:] + " " + err.Error())
+		return ParseError{err}
 	}
 	tgt[15] <<= 1 // unshift bookend
-	unshift(tgt, uint32(version))
-	return nil
+	unshift(tgt, uint32(v))
+	return checkVariant(tgt)
 }
 
 func parseCompact64(tgt *[16]byte, src string) error {
 	runes := []rune(src)
-	version, ok := versionsNCNameTable[runes[0]]
+	v, ok := versionsNCNameTable[runes[0]]
 	if !ok {
-		panic("change to error")
+		return ParseError{}
 	}
+	// s/c nil
+	if v == VersionNil {
+		if src != NilCompact64 {
+			return ParseError{}
+		}
+		*tgt = bytesNil
+		return nil
+	}
+	// s/c max
+	if v == VersionMax {
+		if src != MaxCompact64 {
+			return ParseError{}
+		}
+		*tgt = bytesMax
+		return nil
+	}
+	// not Nil or Max, decode with padding
 	runes[21] = unicode.ToUpper(runes[21])
-	pad := "A"
-	if uint8(version) == VersionMax {
-		pad = "P"
-	}
-	src = string(runes) + pad
-	_, err := base64.RawURLEncoding.Decode((*tgt)[:], []byte(src)[1:])
+	_, err := base64.RawURLEncoding.Decode((*tgt)[:], []byte(string(runes) + "A")[1:])
 	if err != nil {
-		panic(err)
+		return ParseError{err}
 	}
 	tgt[15] <<= 2
-	unshift(tgt, uint32(version))
+	unshift(tgt, uint32(v))
+	return checkVariant(tgt)
+}
+
+func checkVariant(src *[16]byte) error {
+	if variant(*src) != Variant9562 {
+		return ParseError{}
+	}
 	return nil
 }
 
+//nolint:mnd // locality of behavior
 func unshift(tgt *[16]byte, version uint32) {
 	version &= 0xf
 	ints := [4]uint32{
