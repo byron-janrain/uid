@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals,gochecknoinits // test data
 package uid_test
 
 import (

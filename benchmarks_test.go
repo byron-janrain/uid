@@ -1,3 +1,4 @@
+//nolint:errcheck // benchmarks
 package uid_test
 
 import (
@@ -29,6 +30,12 @@ func BenchmarkGofrsV4(b *testing.B) {
 func BenchmarkV7(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = uid.NewV7()
+	}
+}
+
+func BenchmarkV7Batch(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = uid.NewV7Batch()
 	}
 }
 
