@@ -28,7 +28,8 @@ func TestV7(t *testing.T) {
 	assert.InDelta(t, freezeNow.UnixMicro(), id.Time().UnixMicro(), 1)
 	// ensure microsecond is within rounding tolerance 1/4096th of a ms (245ns) + call stack time
 	assert.InDelta(t, freezeNow.UnixNano(), id.Time().UnixNano(), 300)
-	id2 := uid.Must(uid.Parse(id.String()))
+	id2, ok := uid.Parse(id.String())
+	assert.True(t, ok)
 	assert.Exactly(t, id, id2)
 }
 
@@ -71,7 +72,7 @@ func TestSanityBatching(t *testing.T) {
 	// create matching lists as fast as we can across 2ms to ensure capture 1 full ms
 	ts1, ts2 := []uid.UUID{}, []uid.UUID{}
 	for start := time.Now(); time.Since(start) < time.Millisecond; {
-		id := uid.NewV7Batch()
+		id := uid.NewV7Strict()
 		ts1, ts2 = append(ts1, id), append(ts2, id) // fill both arrays instead of cloning later
 	}
 	mss := map[int64]bool{}

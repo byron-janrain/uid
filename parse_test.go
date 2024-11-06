@@ -1,69 +1,59 @@
 package uid_test
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
 	"github.com/byron-janrain/uid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestParseBads(t *testing.T) {
-	check := func(in, expectedErr string, isWrapped bool) {
-		id, err := uid.Parse(in)
-		assert.Panics(t, func() {
-			_ = uid.Must(uid.Parse(in))
-		})
-		require.ErrorAs(t, err, &uid.ParseError{})
-		require.EqualError(t, err, expectedErr)
-		if isWrapped {
-			require.Error(t, errors.Unwrap(err))
-		} else {
-			require.NoError(t, errors.Unwrap(err))
-		}
+	check := func(in string) {
+		id, ok := uid.Parse(in)
+		assert.False(t, ok)
 		assert.Exactly(t, uid.Nil(), id)
 	}
-	defaultErrTxt := uid.ParseError{}.Error()
-	// bad length
-	check("", uid.ParseError{}.Error(), false)
 	// bad canonical nil
-	check("00000000-0000-0000-0000-000000000001", defaultErrTxt, false)
+	check("00000000-0000-0000-0000-000000000001")
 	// bad canonical max
-	check("ffffffff-ffff-ffff-ffff-fffffffffffe", defaultErrTxt, false)
-	// bad canonical encoding/format
-	check(strings.Replace(ref4, "-", "_", 1), "failed to parse UUID: encoding/hex: invalid byte: U+005F '_'", true)
+	check("ffffffff-ffff-ffff-ffff-fffffffffffe")
+	// bad canonical format
+	check(strings.Replace(ref4, "-", "_", 1))
+	// bad canonical encoding
+	check("00000000-0000-4000-8000-g00000000000")
 	// bad canonical version
-	check(strings.ReplaceAll(ref4, "4", "e"), defaultErrTxt, false)
+	check(strings.ReplaceAll(ref4, "4", "e"))
 	// bad canonical v4 variant
-	check("ffffffff-ffff-4fff-efff-ffffffffffff", defaultErrTxt, false)
+	check("ffffffff-ffff-4fff-efff-ffffffffffff")
 	// bad compact32 encoding
-	check("E077777777777777777777777P", "failed to parse UUID: illegal base32 data at input byte 0", true)
+	check("E077777777777777777777777P")
 	// bad compact32 version
-	check("Q777777777777777777777777P", defaultErrTxt, false)
+	check("Q777777777777777777777777P")
 	// bad compact32 nil
-	check("ABAAAAAAAAAAAAAAAAAAAAAAAA", defaultErrTxt, false)
+	check("ABAAAAAAAAAAAAAAAAAAAAAAAA")
 	// bad compact32 version
-	check("P777777777777777777777777Q", defaultErrTxt, false)
+	check("P777777777777777777777777Q")
 	// bad compact64 encoding
-	check("E+___________________P", "failed to parse UUID: illegal base64 data at input byte 0", true)
+	check("E+___________________P")
 	// bad compact64 version
-	check("Q____________________P", defaultErrTxt, false)
+	check("Q____________________P")
 	// bad compact64 variant
-	check("P____________________Q", defaultErrTxt, false)
+	check("P____________________Q")
 	// bad compact64 nil
-	check("ABAAAAAAAAAAAAAAAAAAAA", defaultErrTxt, false)
+	check("ABAAAAAAAAAAAAAAAAAAAA")
 }
 
 func TestSamples(t *testing.T) {
 	tested := 0
 	for _, sample := range sampleData {
-		ids := [3]uid.UUID{
-			uid.Must(uid.Parse(sample.Canonical)),
-			uid.Must(uid.Parse(sample.B32)),
-			uid.Must(uid.Parse(sample.B64)),
-		}
+		c, ok := uid.Parse(sample.Canonical)
+		assert.True(t, ok)
+		b32, ok := uid.Parse(sample.B32)
+		assert.True(t, ok)
+		b64, ok := uid.Parse(sample.B64)
+		assert.True(t, ok)
+		ids := [3]uid.UUID{c, b32, b64}
 		// ensure equivalent parsing
 		assert.Exactly(t, ids[0], ids[1])
 		assert.Exactly(t, ids[1], ids[2])
@@ -81,7 +71,8 @@ func TestSamples(t *testing.T) {
 
 func TestMagicIDs(t *testing.T) {
 	check := func(input string, expected uid.UUID) {
-		actual := uid.Must(uid.Parse(input))
+		actual, ok := uid.Parse(input)
+		assert.True(t, ok)
 		assert.Exactly(t, expected, actual)
 	}
 	// nil

@@ -66,7 +66,4 @@ var (
 		// 'I': 8, // v8 not supported yet
 		'P': VersionMax, // max
 	}
-	versionCanonicalTable = map[byte]Version{
-		'0': VersionNil, '4': Version4, '7': Version7, 'f': VersionMax, 'F': VersionMax,
-	}
 )
