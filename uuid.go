@@ -2,7 +2,6 @@ package uid
 
 import (
 	"bytes"
-	"cmp"
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/binary"
@@ -121,13 +120,5 @@ func (u UUID) shifted() (out [16]byte) {
 	return
 }
 
-// Compare u to other. See Compare(UUID,UUID).
-func (u UUID) Compare(other UUID) int {
-	if u.Version() == Version7 && other.Version() == Version7 {
-		return cmp.Compare(u.Time().UnixNano(), other.Time().UnixNano())
-	}
-	return bytes.Compare(u.b[:], other.b[:])
-}
-
-// Compare helps with sorting/deduping though it's only useful for v7.
-func Compare(a, b UUID) int { return a.Compare(b) }
+// Compare is a helper for sorting/deduping by monotonic time. Note: Sorting non-v7 IDs is a design flaw.
+func Compare(a, b UUID) int { return bytes.Compare(a.b[:8], b.b[:8]) } // unix_ms_ts and rand_a (monotonic times)
