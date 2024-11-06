@@ -43,7 +43,7 @@ func Parse[T []byte | string](src T) (UUID, bool) {
 //nolint:gochecknoglobals // localit
 var offsets = [8]byte{0, 4, 9, 14, 19, 24, 28, 32}
 
-//nolint:cyclop // parser...
+//nolint:cyclop,mnd // parser...
 func parseCanonical(tgt *[16]byte, src string) bool {
 	if src[8] != '-' || src[13] != '-' || src[18] != '-' || src[23] != '-' {
 		return false
@@ -66,7 +66,7 @@ func parseCanonical(tgt *[16]byte, src string) bool {
 		return false
 	}
 	for x, i := range offsets {
-		n, err := hex.Decode((*tgt)[x*2:(x*2)+2], []byte(src[i:i+4])) //nolint:mnd // lob
+		n, err := hex.Decode((*tgt)[x*2:(x*2)+2], []byte(src[i:i+4]))
 		if err != nil || n != 2 {
 			return false
 		}

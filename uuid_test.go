@@ -124,7 +124,7 @@ func TestMax(t *testing.T) {
 }
 
 func TestCompare(t *testing.T) {
-	assert.Exactly(t, 0, uid.Nil().Compare(uid.Nil()))
+	assert.Exactly(t, 0, uid.Compare(uid.Nil(), uid.Nil()))
 	assert.Exactly(t, 0, uid.Compare(uid.Max(), uid.Max()))
 	id1 := uid.NewV7()
 	time.Sleep(time.Microsecond)
