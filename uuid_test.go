@@ -2,6 +2,7 @@ package uid_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,10 +67,25 @@ func TestBytesImmutable(t *testing.T) {
 	assert.Exactly(t, id.Bytes(), uid.Max().Bytes())
 }
 
+func TestUnmarshalBinaryFail(t *testing.T) {
+	var id uid.UUID
+	err := id.UnmarshalBinary([]byte{})
+	require.Error(t, err)
+	assert.True(t, strings.HasPrefix(err.Error(), "failed to unmarshal binary: "))
+}
+
+func TestUnmarshalTextFail(t *testing.T) {
+	var id uid.UUID
+	err := id.UnmarshalText([]byte{})
+	require.Error(t, err)
+	assert.True(t, strings.HasPrefix(err.Error(), "failed to unmarshal text: "))
+}
+
 func TestUnmarshalJSONFail(t *testing.T) {
 	var id uid.UUID
 	err := id.UnmarshalJSON([]byte{})
-	assert.Exactly(t, uid.ParseError{}, err)
+	require.Error(t, err)
+	assert.True(t, strings.HasPrefix(err.Error(), "failed to unmarshal json: "))
 }
 
 func TestNil(t *testing.T) {

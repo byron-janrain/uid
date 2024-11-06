@@ -53,31 +53,31 @@ func msranda(t time.Time) (int64, int64) {
 func tick() (int64, int64) { return msranda(now()) }
 
 /*
-NewV7Batch returns a v7 UUID but guarantees local monotonicity.
+NewV7Strict returns a v7 UUID with guaranteed (beyond RFC method 3) local monotonicity.
 If you think you need this, you don't. If you know you need this, your design is bad.
 */
-func NewV7Batch() UUID { return make7(tickBatch) }
+func NewV7Strict() UUID { return make7(tickBatch) }
 
 //nolint:gochecknoglobals // unexported
 var (
-	batchLock          = new(sync.Mutex)
-	batchms, batchtick = msranda(now())
+	mux              = new(sync.Mutex)
+	lastms, lasttick = msranda(now())
 )
 
 //nolint:nonamedreturns // golf
 func tickBatch() (ms, tick int64) {
-	batchLock.Lock()
-	defer batchLock.Unlock()
+	mux.Lock()
+	defer mux.Unlock()
 	for {
 		ms, tick = msranda(now())
-		if ms > batchms {
+		if ms > lastms {
 			// now ms newer than last ms
-			batchms, batchtick = ms, tick
+			lastms, lasttick = ms, tick
 			return
 		}
-		if ms == batchms && tick > batchtick {
+		if ms == lastms && tick > lasttick {
 			// in same ms, but tick is newer than last tick
-			batchtick = tick
+			lasttick = tick
 			return
 		}
 	}

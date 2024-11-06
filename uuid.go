@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 )
 
 // UUID is a UUID as defined by RFC...
@@ -29,9 +30,12 @@ func (u UUID) Bytes() []byte { return u.b[:] } // copy
 func (u UUID) MarshalBinary() ([]byte, error) { return u.b[:], nil }
 
 // UnmarshalBinary implement encoding.BinaryUnmarshaler.
-func (u *UUID) UnmarshalBinary(b []byte) (err error) { //nolint:nonamedreturns // golf
-	*u, err = Parse(string(b))
-	return
+func (u *UUID) UnmarshalBinary(b []byte) error {
+	if id, ok := Parse(b); ok {
+		*u = id
+		return nil
+	}
+	return fmt.Errorf("failed to unmarshal binary: %s", b) //nolint:goerr113 // foreign interface
 }
 
 // String implements fmt.Stringer. Returns canonical RFC-4122 representation.
@@ -50,21 +54,24 @@ func (u UUID) String() string {
 func (u UUID) MarshalText() ([]byte, error) { return []byte(u.String()), nil }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (u *UUID) UnmarshalText(b []byte) (err error) { //nolint:nonamedreturns // golf
-	*u, err = Parse(string(b))
-	return err
+func (u *UUID) UnmarshalText(b []byte) error {
+	if id, ok := Parse(string(b)); ok {
+		*u = id
+		return nil
+	}
+	return fmt.Errorf("failed to unmarshal text: %s", b) //nolint:goerr113 // foreign interface
 }
 
 // MarshalJSON implements encoding/json.Marshaler. Never returns errors.
 func (u UUID) MarshalJSON() ([]byte, error) { return []byte(`"` + u.String() + `"`), nil }
 
 // UnmarshalJSON implements encoding/json.Unmarshaler.
-func (u *UUID) UnmarshalJSON(b []byte) (err error) { //nolint:nonamedreturns // golf
-	if len(b) < 2 { //nolint:mnd // lob
-		return ParseError{}
+func (u *UUID) UnmarshalJSON(b []byte) error {
+	if id, ok := Parse(string(b)); ok {
+		*u = id
+		return nil
 	}
-	*u, err = Parse(string(b[1 : len(b)-1]))
-	return
+	return fmt.Errorf("failed to unmarshal json: %s", b) //nolint:goerr113 // foreign interface
 }
 
 // Compact32 returns NCName Base32 representation.
