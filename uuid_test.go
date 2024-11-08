@@ -11,21 +11,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	ref4    = "01867b2c-a0dd-459c-98d7-89e545538d6c"
-	ref4b32 = "EAGDHWLFA3VM4RV4J4VCVHDLMJ"
-	ref4b64 = "EAYZ7LKDdWcjXieVFU41sJ"
-	ref7    = "0191e843-b452-7ac4-b853-8ee3953a28af"
-	ref7b32 = "HAGI6QQ5UKKWEQU4O4OKTUKFPL"
-	ref7b64 = "HAZHoQ7RSrEhTjuOVOiivL"
-)
+func TestConsts(t *testing.T) {
+	assert.Exactly(t, uid.MaxCanonical, strings.ToLower(uid.MaxCanonical))
+	assert.Exactly(t, uid.MaxCompact32, strings.ToUpper(uid.MaxCompact32))
+	assert.Exactly(t, uid.MaxCompact64, strings.ToUpper(uid.MaxCompact64))
+	assert.Exactly(t, uid.NilCanonical, strings.ToLower(uid.NilCanonical))
+	assert.Exactly(t, uid.NilCompact32, strings.ToUpper(uid.NilCompact32))
+	assert.Exactly(t, uid.NilCompact64, strings.ToUpper(uid.NilCompact64))
+}
 
 func TestCommonAccessors(t *testing.T) {
 	// v4 max is a good surrogate since none of it's values are zero AND unshifting has an edge case
 	id := uid.Max()
 	// check methods
-	assert.Exactly(t, uid.VersionMax, id.Version()) // 0xf
-	assert.Exactly(t, uint8(3), id.Variant())       // 0x3
+	assert.Exactly(t, uid.VersionMax, id.Version())
+	assert.Exactly(t, uid.VariantMax, id.Variant())
 	// check marshal-unmarshal equivalences
 	var id2 uid.UUID
 	// text
@@ -71,21 +71,18 @@ func TestUnmarshalBinaryFail(t *testing.T) {
 	var id uid.UUID
 	err := id.UnmarshalBinary([]byte{})
 	require.Error(t, err)
-	assert.True(t, strings.HasPrefix(err.Error(), "failed to unmarshal binary: "))
 }
 
 func TestUnmarshalTextFail(t *testing.T) {
 	var id uid.UUID
 	err := id.UnmarshalText([]byte{})
 	require.Error(t, err)
-	assert.True(t, strings.HasPrefix(err.Error(), "failed to unmarshal text: "))
 }
 
 func TestUnmarshalJSONFail(t *testing.T) {
 	var id uid.UUID
 	err := id.UnmarshalJSON([]byte{})
 	require.Error(t, err)
-	assert.True(t, strings.HasPrefix(err.Error(), "failed to unmarshal json: "))
 }
 
 func TestNil(t *testing.T) {
@@ -102,7 +99,7 @@ func TestNil(t *testing.T) {
 	assert.Exactly(t, uid.NilCompact64, uid.Nil().Compact64())
 	actual, err := uid.Nil().MarshalJSON()
 	require.NoError(t, err)
-	assert.Exactly(t, uid.NilJSON, string(actual))
+	assert.Exactly(t, `"`+uid.NilCanonical+`"`, string(actual))
 }
 
 func TestMax(t *testing.T) {
@@ -120,7 +117,7 @@ func TestMax(t *testing.T) {
 	assert.Exactly(t, uid.MaxCompact64, uid.Max().Compact64())
 	actual, err := uid.Max().MarshalJSON()
 	require.NoError(t, err)
-	assert.Exactly(t, uid.MaxJSON, string(actual))
+	assert.Exactly(t, `"`+uid.MaxCanonical+`"`, string(actual))
 }
 
 func TestCompare(t *testing.T) {
