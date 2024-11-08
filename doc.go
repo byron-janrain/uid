@@ -6,64 +6,61 @@ monotonicity.
 */
 package uid
 
-// MaxCanonical is the canonical RFC9562 "Max" UUID.
-const MaxCanonical = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+const (
+	// MaxCanonical is the canonical RFC9562 "Max" UUID.
+	MaxCanonical = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
-// MaxCompact32 is the canonical NCName Compact Base32 "Max" UUID.
-const MaxCompact32 = "P777777777777777777777777P"
+	// MaxCompact32 is the canonical NCName Compact Base32 "Max" UUID.
+	MaxCompact32 = "P777777777777777777777777P"
 
-// MaxCompact64 is the canonical NCName Compact Base64 "Max" UUID.
-const MaxCompact64 = "P____________________P"
+	// MaxCompact64 is the canonical NCName Compact Base64 "Max" UUID.
+	MaxCompact64 = "P____________________P"
 
-// MaxJSON is the canonical JSON "Max" UUID.
-const MaxJSON = `"ffffffff-ffff-ffff-ffff-ffffffffffff"`
+	// NilCanonical is the canonical RFC9562 "Nil" UUID.
+	NilCanonical = "00000000-0000-0000-0000-000000000000"
 
-// NilCanonical is the canonical RFC9562 "Nil" UUID.
-const NilCanonical = "00000000-0000-0000-0000-000000000000"
+	// NilCompact32 is the canonical NCName Compact Base32 "Nil" UUID.
+	NilCompact32 = "AAAAAAAAAAAAAAAAAAAAAAAAAA"
 
-// NilCompact32 is the canonical NCName Compact Base32 "Nil" UUID.
-const NilCompact32 = "AAAAAAAAAAAAAAAAAAAAAAAAAA"
-
-// NilCompact64 is the canonical NCName Compact Base64 "Nil" UUID.
-const NilCompact64 = "AAAAAAAAAAAAAAAAAAAAAA"
-
-// NilJSON is the canonical JSON "Nil" UUID.
-const NilJSON = `"00000000-0000-0000-0000-000000000000"`
-
-// VersionNil is the Nil UUID version.
-const VersionNil = Version(0) // 0x0
-
-// Version4 is the version of random UUIDs.
-const Version4 = Version(4) // 0x4
-
-// Version7 is the version of time-sortable UUIDs.
-const Version7 = Version(7) // 0x7
-
-// VersionMax is the Max UUID version.
-const VersionMax = Version(15) // 0xf
-
-// Variant9562 is the variant that RFC9562 defines for the types therein.
-const Variant9562 = uint8(2) // 0x2
+	// NilCompact64 is the canonical NCName Compact Base64 "Nil" UUID.
+	NilCompact64 = "AAAAAAAAAAAAAAAAAAAAAA"
+)
 
 // Version is the RFC9562 UUID Version.
-type Version uint8
+type Version byte
 
-//nolint:gochecknoglobals // wtb const builtins
+const (
+	// VersionNil is the Nil UUID version.
+	VersionNil = Version(0b0000_0000)
+
+	// Version4 is the version of random UUIDs.
+	Version4 = Version(0b0000_0100)
+
+	// Version7 is the version of time-sortable UUIDs.
+	Version7 = Version(0b0000_0111)
+
+	// VersionMax is the Max UUID version.
+	VersionMax = Version(0b0000_1111)
+
+	versionBad = Version(0b1111_1111) // sentinel version to identify malformed UUIDs.
+)
+
+// Variant is the RFC9562 variant.
+type Variant byte
+
+const (
+	// Variant9562 is the value of the variant bits of v4 or v7.
+	Variant9562 = Variant(0b0000_0010)
+
+	// VariantNil is the value of the variant bits of a Nil UUID.
+	VariantNil = Variant(0b0000_0000)
+
+	// VariantMax is the value of the variant bits of a Max UUID.
+	VariantMax = Variant(0b0000_0111)
+)
+
+//nolint:gochecknoglobals // wtb const arrays
 var (
 	bytesNil = [16]byte{}
-	bytesMax = [16]byte{
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-	}
-	versionsNCNameTable = map[rune]Version{
-		'A': VersionNil, // nil
-		// 'B': 1, // v1 not supported yet
-		// 'C': 2, // v2 not supported yet
-		// 'D': 3, // v3 not supported yet
-		'E': Version4, // v4
-		// 'F': 5, // v5 not supported yet
-		// 'G': 6, // v6 not supported yet
-		'H': Version7, // v7
-		// 'I': 8, // v8 not supported yet
-		'P': VersionMax, // max
-	}
+	bytesMax = [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 )
