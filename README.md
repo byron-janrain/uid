@@ -1,27 +1,31 @@
 # Yet another UUID library!?
 
-It's always bugged me that the libraries in widespread use for generating UUIDs can return errors. Ultimately this is
-because they are using "Too Much Crypto" https://eprint.iacr.org/2019/1492.pdf.
+The wonderful libraries by Google and Gofrs have served us quite well, however, they have two fatal flaws. First, they
+use "Too Much Crypto" https://eprint.iacr.org/2019/1492.pdf. Second, ironically given the first, they can return errors.
 
-While it's idiomatic to wrap every `New` in a  `Log(err)` (if you're responsible), or `Must` (if you're optimistic),
-it's bloaty, slow, and possibly dangerous.
+It's idiomatic to wrap every `New` in a  `Log(err)` (if you're responsible), or `Must` (if you're optimistic), but it's
+verbose, inefficient, and possibly dangerous. All errors should be informative, safe, and actionable. I rarely see
+UUID errors translated so they are effectively sentinels outside of English. Is it always okay to send the raw error to
+the client considering the source of errors for a UUID constructor is a randomness unavailability or underflow? Finally,
+what action would the caller take other than trying again until it works? Should they have backoff?
 
-`uid` constructs RFC compliant v4 and v7 UUIDs an order of magnitude faster than Google/Gofrs, with zero allocations,
-and, most importantly, no errors.
+IMO a UUID library should be incapable of constructor failure and only return sentinel errors for parse failures.
 
-Essentially, `uid` is just following Go's `math/rand/v2` and Linux's `/dev/random` changes to use ChaCha20-based
-cryptographic pseudorandom number generators (CPRNG). If it's good enough for them, it's good enough for you.
+`uid` constructs RFC compliant v4 and v7 UUIDs with no errors. Moreover, it parses without errors and, as a bonus, is an
+order of magnitude faster on construction than Google/Gofrs, without adding any allocations.
 
-As the benchmarks show, generating IDs is way faster, but still does not allocate, and cannot return errors.
-Parsing IDs is comparably fast, still does not allocate, and returns blind success indicators. It's up to your input
-validation to take the failure and make it observable or craft a safe and appropriate response to the caller.
+This library follows Go's `math/rand/v2` and Linux's `/dev/random` changes to use ChaCha20-based cryptographic
+pseudorandom number generators (CPRNG) to ensure no errors during random fills.
 
-** Strictly speaking, `UnmarshalXXX` methods return errors because their interfaces require it. But `uid.ParseError` is
-a purely sentinel error. No string to translate, sanitize, or unwrap.
+## But Unmarshal and Parse return errors!
 
-** Technically speaking, Parse also returns "errors" if you squint hard enough at that `bool`. However, in addition to
-being inherently safe, simple validations are simply `if !ok` instead of the `if errors.Is`, `if errors.As`, or
-`if err != nil` patterns.
+`UnmarshalXXX` methods return errors because their interfaces require it. `uid.ParseError`, however, is purely a
+sentinel error. Nothing to translate or sanitize. At worst you could check for it by type in an `errors.Is|As` chain,
+which you're already doing as necessary.
+
+Technically speaking, Parse's "ok" idiom is also an "error pattern". However, the expected usage of `uid.Parse` is
+likely an API context (users should never be asked for a UUID) where input validation strictness needs only check for
+validity before rejecting the entire request see the example below.
 
 # How To
 
@@ -44,12 +48,16 @@ id := uid.NewV7Strict()
 
 ## Parse
 
+Because `uid` does not include error messages, you are free to observe and translate the failure (or not) as necessary.
+
 ```go
-id, ok := uid.Parse(input)
+id, ok := uid.Parse(r.PathValue("id"))
 if !ok {
-    slog.Log("bad input: %s", input) // observe it your way
-    // you can't accidentaly leak an error if you don't have one.
-    http.Error(w, "bad input", http.StatusBadRequest)
+    // observe it your way
+    slog.Log("bad ID: %s", input)
+    badIDCounter.Inc()
+    // translate error messages your way
+    http.Error(w, messagePrinter.Sprint("invalid ID"), http.StatusBadRequest)
     return
 }
 ```
