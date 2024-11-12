@@ -11,6 +11,8 @@ import (
 // UUID is a UUID as defined by RFC...
 // Underlying array is unexported for immutability. UUID is comparable using `==`.
 // The zero value is Nil UUID.
+//
+//nolint:recvcheck // only unserializers should have (temporarily) have pointers.
 type UUID struct{ b [16]byte }
 
 // Version returns u's version.
