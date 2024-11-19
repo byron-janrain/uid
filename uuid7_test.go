@@ -68,6 +68,25 @@ func TestSanity(t *testing.T) {
 	assert.Exactly(t, len(ts1), len(slices.Compact(ts1)))
 }
 
+func TestV7StrictIsV7(t *testing.T) {
+	freezeNow := time.Now()
+	defer uid.ReseedPRNG()()
+	defer uid.SetNowFunc(func() time.Time { return freezeNow })()
+	id := uid.NewV7Strict()
+	// identity
+	assert.Exactly(t, uid.Version7, id.Version())
+	assert.False(t, id.IsMax())
+	assert.False(t, id.IsNil())
+	assert.False(t, id.Time().IsZero())
+	// randomness preserved
+	assert.True(t, strings.HasSuffix(id.String(), "-9987-7ece6d368aac"))
+	// time
+	assert.Exactly(t, freezeNow.UnixMilli(), id.Time().UnixMilli())
+	id2, ok := uid.Parse(id.String())
+	assert.True(t, ok)
+	assert.Exactly(t, id, id2)
+}
+
 func TestSanityBatching(t *testing.T) {
 	// create matching lists as fast as we can across 2ms to ensure capture 1 full ms
 	ts1, ts2 := []uid.UUID{}, []uid.UUID{}
