@@ -6,9 +6,9 @@ use "Too Much Crypto" https://eprint.iacr.org/2019/1492.pdf. Second, ironically 
 It's idiomatic to wrap every `New` in a  `Log(err)` (if you're responsible), or `Must` (if you're optimistic), but it's
 verbose, inefficient, and possibly dangerous. All errors should be informative, safe, and actionable.
 
-Is it always okay to send the raw error to the client? Should they know there is a randomness underflow? If you only
-return untranslated error text, is that not a sentinel error to every non-native reader? What action (besides logging
-or panicking) should the caller take? Retry until it works? Will they properly back off?
+Is it always okay to send the raw error to the client? Should they know there is a randomness underflow? Aren't
+untranslated errors just sentinels to unfluent readers? What action (besides logging or panicking) should the caller
+take? Retry until it works? Will they properly back off?
 
 What if you could make UUIDs without handling errors? What if all parse/validation errors were an explicit sentinel?
 
@@ -17,6 +17,14 @@ order of magnitude faster on construction than Google/Gofrs.
 
 This library follows Go's `math/rand/v2` and Linux's `/dev/random` changes to use ChaCha20-based cryptographic
 pseudorandom number generators (CPRNG) to ensure no errors during random fills.
+
+## What about Short UUIDs?
+
+I've included implementations of https://datatracker.ietf.org/doc/draft-taylor-uuid-ncname/ for the b32
+(shorter and case-insensitive) and b64 (shortest but case-sensitive) encodings of a UUID. Arbitrary shorteners and any
+library based on the Python `shortuuid` algorithm still can produce encodings with leading digits which require escaping
+to use in `id` and `class` markup. NCName-encoded UUIDs are safe for use in CSS classes, DOM IDs, and URIs without
+escaping.
 
 ## But Unmarshal and Parse return errors!
 
