@@ -6,11 +6,11 @@ use "Too Much Crypto" https://eprint.iacr.org/2019/1492.pdf. Second, ironically 
 It's idiomatic to wrap every `New` in a  `Log(err)` (if you're responsible), or `Must` (if you're optimistic), but it's
 verbose, inefficient, and possibly dangerous. All errors should be informative, safe, and actionable.
 
-Is it always okay to send the raw error to the client? Should they know there is a randomness underflow? Aren't
-untranslated errors just sentinels to unfluent readers? What action (besides logging or panicking) should the caller
-take? Retry until it works? Will they properly back off?
+Is it always okay to send the raw error to the client? Should they know there is a randomness underflow? Untranslated
+(non-internationalized) errors are only sentinels to unfluent readers anyway. What action (besides logging or
+panicking) can the caller take with a "bad" UUID? Retry until it works? Will they properly back off?
 
-What if you could make UUIDs without handling errors? What if all parse/validation errors were an explicit sentinel?
+This library constructs UUIDs without errors. Parse/validation failure is explicitly the sentinel it's always been.
 
 `uid` constructs RFC compliant v4 and v7 UUIDs with no errors. Moreover, it parses without errors and, as a bonus, is an
 order of magnitude faster on construction than Google/Gofrs.
@@ -20,17 +20,17 @@ pseudorandom number generators (CPRNG) to ensure no errors during random fills.
 
 ## What about Short UUIDs?
 
-I've included implementations of https://datatracker.ietf.org/doc/draft-taylor-uuid-ncname/ for the b32
-(shorter and case-insensitive) and b64 (shortest but case-sensitive) encodings of a UUID. Arbitrary shorteners and any
-library based on the Python `shortuuid` algorithm still can produce encodings with leading digits which require escaping
-to use in `id` and `class` markup. NCName-encoded UUIDs are safe for use in CSS classes, DOM IDs, and URIs without
-escaping.
+`uid.UUID` implements compact UUIDs encoded per https://datatracker.ietf.org/doc/draft-taylor-uuid-ncname/. Specifically
+Base32 (shorter and case-insensitive) and Base64url (shortest but case-sensitive). Arbitrary shorteners and any
+library based on the Python `shortuuid` algorithm still can produce encodings with leading digits which are prohibited in
+DOM IDs and require escaping in CSS classes. NCName-encoded UUIDs are safe for use in CSS classes, DOM IDs, and URIs
+without escaping.
 
 ## But Unmarshal and Parse return errors!
 
-`UnmarshalXXX` methods return errors because their interfaces require it. `uid.ParseError`, however, is purely a
-sentinel error. No text to translate or sanitize. Check it for `nil` and move on, UUIDs are not your apps primary
-concern.
+`UnmarshalXXX` methods return errors because the implemented interfaces require it. `uid.ParseError`, however, is purely
+a sentinel error. No text to translate or sanitize. Check it for `nil` and move on like you would have before, "bad UUID"
+is probably not your service's primary concern.
 
 Technically speaking, `Parse`'s "ok" idiom is an error "pattern". However, the expected usage of `uid.Parse` is
 in an API context (users should never be asked to type a UUID) where input validation strictness needs only check for
