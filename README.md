@@ -72,3 +72,17 @@ if !ok {
     return
 }
 ```
+
+# NCName support
+
+`Parse` supports automatic detection and decoding NCName Compact UUID Base32 and Base64 encodings.
+
+`UUID.Compact64()` and `UUID.Compact32()` return the Base64 and Base32 NCName encoded values, respectively.
+
+# ShortUUID support
+
+`FromPythonShort` enables decoding of Python ShortUUID encoded UUIDs using the default alphabet (Base57) and padding
+(22-rune length).
+
+`ToPythonShort` encodes a given `UUID` into a Python ShortUUID using the default alphabet (Base57) and padding
+(22-rune length).
