@@ -16,6 +16,9 @@ const (
 	// MaxCompact64 is the canonical NCName Compact Base64 "Max" UUID.
 	MaxCompact64 = "P____________________P"
 
+	// MaxPythonShort is the canonical "Max" Python ShortUUID.
+	MaxPythonShort = "oZEq7ovRbLq6UnGMPwc8B5"
+
 	// NilCanonical is the canonical RFC9562 "Nil" UUID.
 	NilCanonical = "00000000-0000-0000-0000-000000000000"
 
@@ -24,6 +27,9 @@ const (
 
 	// NilCompact64 is the canonical NCName Compact Base64 "Nil" UUID.
 	NilCompact64 = "AAAAAAAAAAAAAAAAAAAAAA"
+
+	// NilPythonShort is the canonical "Nil" Python ShortUUID.
+	NilPythonShort = "2222222222222222222222"
 )
 
 // Version is the RFC9562 UUID Version.
