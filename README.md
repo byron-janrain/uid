@@ -3,42 +3,37 @@
 The wonderful libraries by Google and Gofrs have served us quite well, however, they have two fatal flaws. First, they
 use "Too Much Crypto" https://eprint.iacr.org/2019/1492.pdf. Second, ironically given the first, they can return errors.
 
-It's idiomatic to wrap every `New` in a  `Log(err)` (if you're responsible), or `Must` (if you're optimistic), but it's
-verbose, inefficient, and possibly dangerous. All errors should be informative, safe, and actionable.
+The idiom to wrap every `New` in a  `Log(err)` (responsible), or `Must` (optimistic), is verbose, inefficient, and
+possibly dangerous.
 
-Is it always okay to send the raw error to the client? Should they know there is a randomness underflow? Untranslated
-(non-internationalized) errors are only sentinels to unfluent readers anyway. What action (besides logging or
-panicking) can the caller take with a "bad" UUID? Retry until it works? Will they properly back off?
+This library is opinionated about what UUIDs are worthwhile (v4 and v7), how you should handle errors when parsing or
+unmarshalling (sentinel), and even which compact serializations are useful (NCName).
 
-This library constructs UUIDs without errors. Parse/validation failure is explicitly the sentinel it's always been.
-
-`uid` constructs RFC compliant v4 and v7 UUIDs with no errors. Moreover, it parses without errors and, as a bonus, is an
-order of magnitude faster on construction than Google/Gofrs.
+## But the crypto!
 
 This library follows Go's `math/rand/v2` and Linux's `/dev/random` changes to use ChaCha20-based cryptographic
-pseudorandom number generators (CPRNG) to ensure no errors during random fills.
+pseudorandom number generators to ensure error-free generation and speed. UUIDs are not cryptographic keys or secrets.
 
-## What about Short UUIDs?
+## But the errors!
 
-`uid.UUID` implements compact UUIDs encoded per https://datatracker.ietf.org/doc/draft-taylor-uuid-ncname/. Specifically
-Base32 (shorter and case-insensitive) and Base64url (shortest but case-sensitive). Arbitrary shorteners and any
-library based on the Python `shortuuid` algorithm still can produce encodings with leading digits which are prohibited in
-DOM IDs and require escaping in CSS classes. NCName-encoded UUIDs are safe for use in CSS classes, DOM IDs, and URIs
-without escaping.
+`uid.ParseError` (only returned from unmarshaling failures) is just a sentinel. It has no text to translate or sanitize.
+It's functionally boolean because it's `nil` or not.
 
-## But Unmarshal and Parse return errors!
+Removing error text frees / requirs you to handle (count, log, translate, etc...) parse failure (or not) your way.
 
-`UnmarshalXXX` methods return errors because the implemented interfaces require it. `uid.ParseError`, however, is purely
-a sentinel error. No text to translate or sanitize. Check it for `nil` and move on like you would have before, "bad UUID"
-is probably not your service's primary concern.
-
-Technically speaking, `Parse`'s "ok" idiom is an error "pattern". However, the expected usage of `uid.Parse` is
-in an API context (users should never be asked to type a UUID) where input validation strictness needs only check for
-validity before rejecting the entire request see the example below.
+```go
+id, ok := uid.Parse(r.PathValue("id"))
+if !ok {
+    // observe it your way
+    slog.Log("bad ID: %s", sanitizeForLog(input))
+    badIDCounter.Inc()
+    // translate responses your way
+    http.Error(w, messagePrinter.Sprint("invalid ID"), http.StatusBadRequest)
+    return
+}
+```
 
 # How To
-
-## Generate
 
 New Random UUID (v4)...
 ```go
@@ -56,33 +51,41 @@ here if you need it.)
 id := uid.NewV7Strict()
 ```
 
-## Parse
+## Short Serializations
 
-Because `uid` does not include error messages, you are free to handle (count, log, translate, etc...) the failure (or
-not) your way.
+The "hex-and-dash" encoding of a canonical UUID is already URL-safe and contains no ambiguous characters. Omitting the
+dashes (which are positional anyway) gives you a short (32-runes), case-insensitive, URL-safe identifier string.
 
-```go
-id, ok := uid.Parse(r.PathValue("id"))
-if !ok {
-    // observe it your way
-    slog.Log("bad ID: %s", sanitizeForLog(input))
-    badIDCounter.Inc()
-    // translate responses your way
-    http.Error(w, messagePrinter.Sprint("invalid ID"), http.StatusBadRequest)
-    return
-}
-```
+Sometimes an even shorter (but still non-binary) string is helpful. `uid` supports Compact UUIDs and ShortUUIDs.
 
-# NCName support
+### Compact UUIDs for Constrained Grammars (NCName)
 
-`Parse` supports automatic detection and decoding NCName Compact UUID Base32 and Base64 encodings.
+`Parse` supports automatic detection and decoding of `UUID-NCName-32` and `UUID-NCName-64` compact encodings for
+constrained grammars.
 
 `UUID.Compact64()` and `UUID.Compact32()` return the Base64 and Base32 NCName encoded values, respectively.
 
-# ShortUUID support
+These formats achieve or preserve the goals of compaction, URL-safety, and CSS/DOM identifier safety.
+
+More info: https://datatracker.ietf.org/doc/draft-taylor-uuid-ncname/
+
+### ShortUUID support
+
+Python ShortUUID is problematic in multiple ways.
+
+1. The common implementation accepts ANY alphabet (and padding) endangering transferability.
+2. The encoding algorithm does not encode standard alphabets using standard mappings. If you "ShortUUID" encode using
+the Base64 alphabet, you cannot Base64 decode the result back into the original bytes.
+3. Base57 (default alphabet) has no other usage.
+4. Optimizing for "manual human entry" is problematic in itself but Base57 still includes the `o` rune. The more
+commonly used Base56 omits `o`.
+5. Base57 alphabet ShortUUIDs may contain leading digits (often due to left-padding with `2`) making them unsuitable for
+DOM and CSS identifiers without escaping.
+
+Despite all this, it's a popular library and you may be interacting with a system that already uses them so the
+following helpers
 
 `FromPythonShort` enables decoding of Python ShortUUID encoded UUIDs using the default alphabet (Base57) and padding
-(22-rune length).
+(22).
 
-`ToPythonShort` encodes a given `UUID` into a Python ShortUUID using the default alphabet (Base57) and padding
-(22-rune length).
+`ToPythonShort` encodes a given `UUID` into a Python ShortUUID using the default alphabet (Base57) and padding (22).
