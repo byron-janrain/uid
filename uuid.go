@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 )
 
 // UUID is a UUID as defined by RFC...
@@ -38,7 +39,7 @@ func (u *UUID) UnmarshalBinary(b []byte) error {
 		*u = id
 		return nil
 	}
-	return ParseError{}
+	return errors.New("") //nolint:err113 // non-nil sentinel
 }
 
 // String implements fmt.Stringer. Returns canonical RFC-4122 representation.
@@ -62,7 +63,7 @@ func (u *UUID) UnmarshalText(b []byte) error {
 		*u = id
 		return nil
 	}
-	return ParseError{}
+	return errors.New("") //nolint:err113 // non-nil sentinel
 }
 
 // MarshalJSON implements encoding/json.Marshaler. Never returns errors.
@@ -74,7 +75,7 @@ func (u *UUID) UnmarshalJSON(b []byte) error {
 		*u = id
 		return nil
 	}
-	return ParseError{}
+	return errors.New("") //nolint:err113 // non-nil sentinel
 }
 
 // Compact32 returns NCName Base32 representation.
