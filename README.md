@@ -16,10 +16,10 @@ pseudorandom number generators to ensure error-free generation and speed. UUIDs 
 
 ## But the errors!
 
-`uid.ParseError` (only returned from unmarshaling failures) is just a sentinel. It has no text to translate or sanitize.
-It's functionally boolean because it's `nil` or not.
+Errors returned from unmarshalling functions are anonymous, message-free sentinels. With no text to translate or
+sanitize they are functionally boolean: `nil` or not.
 
-Removing error text frees / requirs you to handle (count, log, translate, etc...) parse failure (or not) your way.
+Boolean success and sentinel error returns free (require) you to handle parsing/unmarshalling failures your way.
 
 ```go
 id, ok := uid.Parse(r.PathValue("id"))

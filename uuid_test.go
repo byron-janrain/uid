@@ -70,19 +70,19 @@ func TestBytesImmutable(t *testing.T) {
 func TestUnmarshalBinaryFail(t *testing.T) {
 	var id uid.UUID
 	err := id.UnmarshalBinary([]byte{})
-	require.Error(t, err)
+	require.EqualError(t, err, "")
 }
 
 func TestUnmarshalTextFail(t *testing.T) {
 	var id uid.UUID
 	err := id.UnmarshalText([]byte{})
-	require.Error(t, err)
+	require.EqualError(t, err, "")
 }
 
 func TestUnmarshalJSONFail(t *testing.T) {
 	var id uid.UUID
 	err := id.UnmarshalJSON([]byte{})
-	require.Error(t, err)
+	require.EqualError(t, err, "")
 }
 
 func TestNil(t *testing.T) {
