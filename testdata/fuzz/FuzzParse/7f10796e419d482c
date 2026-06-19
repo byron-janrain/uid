@@ -1,0 +1,2 @@
+go test fuzz v1
+string("\"E000000000000\r00\r0000J\"")

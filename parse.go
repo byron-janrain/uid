@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"slices"
 	"strings"
-	"unicode"
 )
 
 // Parse attempts to parse `src` into a UUID and returns the parsed UUID and `true` on success.
@@ -16,23 +15,25 @@ import (
 func Parse(src string) (UUID, bool) {
 	ln := len(src)
 	switch ln {
-	case 38: // canonical JSON encoded or non-canonical boundaries.
-		src = src[1 : ln-1]
-		fallthrough
 	case 36:
 		return parseCanonical(src)
 	case 16:
 		return parseBytes([]byte(src))
-	case 28: // json encoded ncname32
-		src = src[1 : ln-1]
-		fallthrough
 	case 26:
 		return parseCompact32(src)
-	case 24: // json encoded ncname64
-		src = src[1 : ln-1]
-		fallthrough
 	case 22:
 		return parseCompact64(src)
+	case 38, 28, 24:
+		return parseWrapped(src)
+	}
+	return UUID{}, false
+}
+
+// parseWrapped strips json quotes (any form) or ms-style braces (canonical only) and re-parses.
+func parseWrapped(src string) (UUID, bool) {
+	ln := len(src)
+	if src[0] == '"' && src[ln-1] == '"' || ln == 38 && src[0] == '{' && src[ln-1] == '}' {
+		return Parse(src[1 : ln-1])
 	}
 	return UUID{}, false
 }
@@ -124,11 +125,11 @@ func ncn32V(s string) Version {
 			return Version7
 		}
 	case 'A', 'a':
-		if strings.ToUpper(s) == NilCompact32 {
+		if strings.EqualFold(s, NilCompact32) {
 			return VersionNil
 		}
 	case 'P', 'p':
-		if strings.ToUpper(s) == MaxCompact32 {
+		if strings.EqualFold(s, MaxCompact32) {
 			return VersionMax
 		}
 	}
@@ -185,10 +186,19 @@ func parseCompact32(src string) (UUID, bool) {
 	if v == VersionMax {
 		return UUID{bytesMax}, true
 	}
-	// not Nil or Max, decode with padding v4/v7
+	// not Nil or Max, uppercase ASCII byte-wise (unicode folding can change length) and decode with padding.
+	// decoder rejects non-alphabet (incl. non-ASCII) bytes.
+	var buf [26]byte
+	copy(buf[:25], src[1:])
+	buf[25] = 'A'
+	for i, c := range buf {
+		if 'a' <= c && c <= 'z' {
+			buf[i] = c - ('a' - 'A')
+		}
+	}
 	var out UUID
-	_, err := b32decoder.Decode(out.b[:], []byte(strings.ToUpper(src) + "A")[1:])
-	if err != nil {
+	n, err := b32decoder.Decode(out.b[:], buf[:])
+	if err != nil || n != 16 { // decoder swallows \r\n: short output means invalid input
 		return UUID{}, false
 	}
 	out.b[15] <<= 1 // unshift bookend
@@ -209,12 +219,14 @@ func parseCompact64(src string) (UUID, bool) {
 	if v == VersionMax {
 		return UUID{bytesMax}, true
 	}
-	// not Nil or Max, decode with padding
-	runes := []rune(src)
-	runes[21] = unicode.ToUpper(runes[21])
+	// not Nil or Max, decode with padding. bookend src[21] is validated uppercase; decoder rejects non-alphabet
+	// (incl. non-ASCII) bytes.
+	var buf [22]byte
+	copy(buf[:21], src[1:])
+	buf[21] = 'A'
 	var out UUID
-	_, err := base64.RawURLEncoding.Decode(out.b[:], []byte(string(runes) + "A")[1:])
-	if err != nil {
+	n, err := base64.RawURLEncoding.Decode(out.b[:], buf[:])
+	if err != nil || n != 16 { // decoder swallows \r\n: short output means invalid input
 		return UUID{}, false
 	}
 	out.b[15] <<= 2

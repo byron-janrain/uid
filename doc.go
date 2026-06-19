@@ -1,5 +1,9 @@
 /*
-Package uid ...
+Package uid generates and parses RFC 9562 v4 and v7 UUIDs without returning errors.
+
+Constructors cannot fail: randomness comes from a ChaCha8 CSPRNG seeded once from crypto/rand. Parse detects and
+decodes canonical (plain, json quoted, or ms-style braced), raw byte, and NCName compact (Base32/Base64) encodings.
+Python ShortUUID conversion is provided for interoperability.
 
 UUID V7 uses Method 3 (Replace Leftmost Random Bits with Increased Clock Precision) to implement single-node
 monotonicity.

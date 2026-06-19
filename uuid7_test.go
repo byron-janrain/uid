@@ -3,10 +3,11 @@ package uid_test
 import (
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/byron-janrain/uid"
+	"github.com/hoodie-ninja/uid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -62,10 +63,18 @@ func TestSanity(t *testing.T) {
 	assert.NotEmpty(t, ts2)
 	assert.Exactly(t, ts1, ts2)
 	assert.Len(t, mss, 2) // breaking across ms should only have 2 different ms values
-	// test that times were generated in order
-	assert.True(t, slices.IsSortedFunc(ts1, uid.Compare))
+	// test that times were generated in order (same-slot ids tie on time and interleave on random bits)
+	byTime := func(a, b uid.UUID) int { return a.Time().Compare(b.Time()) }
+	assert.True(t, slices.IsSortedFunc(ts1, byTime))
 	// test uuids are unique (includes randomness)
 	assert.Len(t, ts1, len(slices.Compact(ts1)))
+}
+
+func TestTimeOverflow(t *testing.T) {
+	// v7 with unix_ts_ms beyond the int64 nanosecond range (year 2262+) must return zero time, not garbage
+	id, ok := uid.Parse("ffffffff-ffff-7fff-bfff-ffffffffffff")
+	assert.True(t, ok)
+	assert.True(t, id.Time().IsZero())
 }
 
 func TestV7StrictIsV7(t *testing.T) {
@@ -85,6 +94,25 @@ func TestV7StrictIsV7(t *testing.T) {
 	id2, ok := uid.Parse(id.String())
 	assert.True(t, ok)
 	assert.Exactly(t, id, id2)
+}
+
+func TestV7StrictAdjacentSlots(t *testing.T) {
+	// drive the clock one slot (~244ns) per call: consecutive ids land on adjacent slots, the regime where the
+	// former float slot math collapsed distinct slots into equal (ms, rand_a) pairs
+	defer uid.ResetV7Strict()
+	base := time.Now().Add(time.Hour).Truncate(time.Millisecond)
+	var calls atomic.Int64
+	defer uid.SetNowFunc(func() time.Time {
+		return base.Add(time.Duration(calls.Add(1)-1) * 245 * time.Nanosecond)
+	})()
+	prev := uid.NewV7Strict()
+	for i := range 4000 {
+		cur := uid.NewV7Strict()
+		if uid.Compare(prev, cur) >= 0 {
+			t.Fatalf("not strictly increasing at %d: %s >= %s", i, prev, cur)
+		}
+		prev = cur
+	}
 }
 
 func TestSanityBatching(t *testing.T) {

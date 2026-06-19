@@ -13,8 +13,7 @@ update:
 # find the lint
 .PHONY: lint
 lint:
-	@which golangci-lint || (echo "golangci-lint not in path" && false)
-	# only scan source folders
+	$(if $(shell which golangci-lint),,$(error golangci-lint not in path))
 	golangci-lint run --verbose ./...
 
 # run units
@@ -30,5 +29,5 @@ coverage: test
 # check the sec
 .PHONY: sec
 sec:
-	@which govulncheck || (echo "govulncheck not in path" && false)
+	$(if $(shell which govulncheck),,$(error sqlc not in path))
 	govulncheck ./...

@@ -3,7 +3,7 @@ package uid_test
 import (
 	"testing"
 
-	"github.com/byron-janrain/uid"
+	"github.com/hoodie-ninja/uid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,4 +39,5 @@ func TestFromPythonShortBads(t *testing.T) {
 	shouldFail("tooshort")                                   // too short
 	shouldFail("thisinputislongerthan22runes")               // too long
 	shouldFail("02222" + "22222" + "22222" + "22222" + "22") // right length, bad runes
+	shouldFail("zzzzz" + "zzzzz" + "zzzzz" + "zzzzz" + "zz") // right length, 57^22-1 > 2^128
 }

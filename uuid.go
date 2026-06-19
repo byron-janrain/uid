@@ -6,14 +6,13 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 )
 
 // UUID is a UUID as defined by RFC...
 // Underlying array is unexported for immutability. UUID is comparable using `==`.
 // The zero value is Nil UUID.
 //
-//nolint:recvcheck // only unserializers should have (temporarily) have pointers.
+//nolint:recvcheck // only unserializers should (temporarily) have pointers.
 type UUID struct{ b [16]byte }
 
 // Version returns u's version.
@@ -33,13 +32,13 @@ func (u UUID) Bytes() []byte { return u.b[:] } // copy
 // MarshalBinary implements encoding.BinaryMarshaler. Never returns errors.
 func (u UUID) MarshalBinary() ([]byte, error) { return u.b[:], nil }
 
-// UnmarshalBinary implement encoding.BinaryUnmarshaler.
+// UnmarshalBinary implements encoding.BinaryUnmarshaler. Returns ErrInvalid for malformed input.
 func (u *UUID) UnmarshalBinary(b []byte) error {
 	if id, ok := Parse(string(b)); ok {
 		*u = id
 		return nil
 	}
-	return errors.New("") //nolint:err113 // non-nil sentinel
+	return ErrInvalid
 }
 
 // String implements fmt.Stringer. Returns canonical RFC-4122 representation.
@@ -57,25 +56,25 @@ func (u UUID) String() string {
 // MarshalText implements encoding.TextMarshaler. Never returns errors.
 func (u UUID) MarshalText() ([]byte, error) { return []byte(u.String()), nil }
 
-// UnmarshalText implements encoding.TextUnmarshaler.
+// UnmarshalText implements encoding.TextUnmarshaler. Returns ErrInvalid for malformed input.
 func (u *UUID) UnmarshalText(b []byte) error {
 	if id, ok := Parse(string(b)); ok {
 		*u = id
 		return nil
 	}
-	return errors.New("") //nolint:err113 // non-nil sentinel
+	return ErrInvalid
 }
 
 // MarshalJSON implements encoding/json.Marshaler. Never returns errors.
 func (u UUID) MarshalJSON() ([]byte, error) { return []byte(`"` + u.String() + `"`), nil }
 
-// UnmarshalJSON implements encoding/json.Unmarshaler.
+// UnmarshalJSON implements encoding/json.Unmarshaler. Returns ErrInvalid for malformed input.
 func (u *UUID) UnmarshalJSON(b []byte) error {
 	if id, ok := Parse(string(b)); ok {
 		*u = id
 		return nil
 	}
-	return errors.New("") //nolint:err113 // non-nil sentinel
+	return ErrInvalid
 }
 
 // Compact32 returns NCName Base32 representation.
@@ -125,5 +124,6 @@ func (u UUID) shifted() (out [16]byte) {
 	return //nolint:gofumpt // covered by nonamedreturns
 }
 
-// Compare is a helper for sorting/deduping by monotonic time. Note: Sorting non-v7 IDs is a design flaw.
-func Compare(a, b UUID) int { return bytes.Compare(a.b[:8], b.b[:8]) } // unix_ms_ts and rand_a (monotonic times)
+// Compare implements slices.SortFunc for the UUID type. v7 UUIDs sort by embedded time (unix_ts_ms and rand_a);
+// random bits break ties so distinct UUIDs never compare equal.
+func Compare(a, b UUID) int { return bytes.Compare(a.b[:], b.b[:]) }

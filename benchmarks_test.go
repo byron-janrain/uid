@@ -4,9 +4,9 @@ package uid_test
 import (
 	"testing"
 
-	"github.com/byron-janrain/uid"
 	gofrsuuid "github.com/gofrs/uuid"
 	googleuuid "github.com/google/uuid"
+	"github.com/hoodie-ninja/uid"
 )
 
 func BenchmarkV4(b *testing.B) {

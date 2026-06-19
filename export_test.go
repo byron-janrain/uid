@@ -1,28 +1,22 @@
 package uid
 
 import (
+	"math/rand/v2"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func PoisonInit() {
-	cryptoRead = func(_ []byte) (int, error) { return 0, assert.AnError }
-	_init()
+// ReseedPRNG swaps the PRNG for a zero-seeded ChaCha8 to make output testably predictable.
+func ReseedPRNG() func() {
+	old := rand64
+	rand64 = rand.NewChaCha8([32]byte{}).Uint64
+	return func() { rand64 = old }
 }
 
-// ReseedPRNG seeds the underlying ChaCha8 with zero to make it testably predictable.
-func ReseedPRNG() func() {
-	old, err := rng.MarshalBinary()
-	if err != nil {
-		panic(err)
-	}
-	rng.Seed([32]byte{})
-	return func() {
-		if err := rng.UnmarshalBinary(old); err != nil {
-			panic(err)
-		}
-	}
+// ResetV7Strict zeroes the strict-monotonicity state so tests driving fake clocks don't stall later real-clock tests.
+func ResetV7Strict() {
+	mux.Lock()
+	lastMS, lastRA = 0, 0
+	mux.Unlock()
 }
 
 // SetNowFunc replaces the internal time.Now for unit testing returns a deferrable that undoes this change.
