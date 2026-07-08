@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/byron-janrain/uid"
+	"github.com/hoodie-ninja/uid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,20 +69,17 @@ func TestBytesImmutable(t *testing.T) {
 
 func TestUnmarshalBinaryFail(t *testing.T) {
 	var id uid.UUID
-	err := id.UnmarshalBinary([]byte{})
-	require.EqualError(t, err, "")
+	require.ErrorIs(t, id.UnmarshalBinary([]byte{}), uid.ErrInvalid)
 }
 
 func TestUnmarshalTextFail(t *testing.T) {
 	var id uid.UUID
-	err := id.UnmarshalText([]byte{})
-	require.EqualError(t, err, "")
+	require.ErrorIs(t, id.UnmarshalText([]byte{}), uid.ErrInvalid)
 }
 
 func TestUnmarshalJSONFail(t *testing.T) {
 	var id uid.UUID
-	err := id.UnmarshalJSON([]byte{})
-	require.EqualError(t, err, "")
+	require.ErrorIs(t, id.UnmarshalJSON([]byte{}), uid.ErrInvalid)
 }
 
 func TestNil(t *testing.T) {

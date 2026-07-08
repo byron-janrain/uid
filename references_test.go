@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/byron-janrain/uid"
+	"github.com/hoodie-ninja/uid"
 	"github.com/stretchr/testify/assert"
 )
 

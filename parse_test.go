@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/byron-janrain/uid"
+	"github.com/hoodie-ninja/uid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -162,6 +162,34 @@ func TestParseCompact64Bad(t *testing.T) {
 	checkFail(ref7b64)
 	checkFail(uid.NilCompact64)
 	checkFail(uid.MaxCompact64)
+}
+
+func TestParseBoundaries(t *testing.T) {
+	checkString2Bytes(t, "{"+ref4+"}", ref4Bytes) // ms-style
+	assertBadTxt(t, []rune("x"+ref4+"y"))
+	assertBadTxt(t, []rune("{"+ref4+`"`)) // mismatched
+	assertBadTxt(t, []rune("x"+ref4b32+"y"))
+	assertBadTxt(t, []rune("{"+ref4b32+"}")) // braces are canonical-only
+	assertBadTxt(t, []rune("x"+ref4b64+"y"))
+	assertBadTxt(t, []rune("{"+ref4b64+"}"))
+}
+
+func TestParseCompactCRLF(t *testing.T) {
+	// base32/base64 decoders silently ignore \r and \n; swallowed chars must not part-decode
+	assertBadTxt(t, []rune("E000000000000\r00\r0000J")) // found by FuzzParse
+	b32 := []rune(ref4b32)
+	b32[5] = '\n'
+	assertBadTxt(t, b32)
+}
+
+func TestParseCompact32Multibyte(t *testing.T) {
+	// 26 bytes but 25 runes ('ſ' uppercases to ASCII 'S'): must fail, not part-decode into an invalid UUID
+	assertBadTxt(t, []rune("Eſ"+ref4b32[3:]))
+}
+
+func TestParseCompact64Multibyte(t *testing.T) {
+	// 22 bytes but 21 runes: must fail cleanly, not panic
+	assertBadTxt(t, []rune("Eé"+strings.Repeat("A", 18)+"I"))
 }
 
 func TestParseCompact64CaseSensitive(t *testing.T) {

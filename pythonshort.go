@@ -1,38 +1,41 @@
 package uid
 
 import (
-	"math/big"
+	"encoding/binary"
+	"math/bits"
 	"strings"
 )
 
 const (
 	fiftySeven     = 57
 	pythonShortLen = 22
-	b57decRef      = "23456789" + "ABCDEFGH" + "JKLMN" + "PQRSTUVWXYZ" + "abcdefghijk" + "mnopqrstuvwxyz"
+	b57encRef      = "23456789" + "ABCDEFGH" + "JKLMN" + "PQRSTUVWXYZ" + "abcdefghijk" + "mnopqrstuvwxyz"
 )
 
-//nolint:gochecknoglobals // wtb const arrays and (u)int128
+//nolint:gochecknoglobals // wtb const arrays
 var (
-	b57encRef = [fiftySeven]rune{
-		'2', '3', '4', '5', '6', '7', '8', '9', // 8/57
-		'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', // 16/57
-		'J', 'K', 'L', 'M', 'N', // 21/57
-		'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // 32/57
-		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', // 43/57
-		'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // 57/57
-	}
-	big57 = big.NewInt(fiftySeven)
+	// b57dec maps a byte to its base57 value, 0xff for invalid.
+	b57dec = func() [256]byte {
+		var t [256]byte
+		for i := range t {
+			t[i] = 0xff
+		}
+		for i, c := range b57encRef {
+			t[c] = byte(i)
+		}
+		return t
+	}()
 )
 
 // ToPythonShort returns the Python ShortUUID encoding of u. See https://pypi.org/project/shortuuid.
 func ToPythonShort(u UUID) string {
-	out, q, r := pythonShortBase(), new(big.Int).SetBytes(u.b[:]), new(big.Int)
-	for i := pythonShortLen - 1; i > -1; i-- {
-		q.QuoRem(q, big57, r)
-		out[i] = b57encRef[r.Int64()]
-		if q.Int64() == 0 {
-			break
-		}
+	hi, lo := binary.BigEndian.Uint64(u.b[0:8]), binary.BigEndian.Uint64(u.b[8:16])
+	var out [pythonShortLen]byte
+	for i := pythonShortLen - 1; i >= 0; i-- {
+		var r uint64
+		hi, r = hi/fiftySeven, hi%fiftySeven
+		lo, r = bits.Div64(r, lo, fiftySeven)
+		out[i] = b57encRef[r]
 	}
 	return string(out[:])
 }
@@ -43,31 +46,24 @@ func FromPythonShort(ps string) (UUID, bool) {
 	if len(ps) != pythonShortLen {
 		return UUID{}, false
 	}
-	if ps == MaxPythonShort {
-		return Max(), true
-	}
-	if ps == NilPythonShort {
-		return Nil(), true
-	}
-	n := new(big.Int)
-	for _, r := range ps {
-		i := int64(strings.IndexRune(b57decRef, r))
-		if i == -1 {
+	var hi, lo uint64
+	for i := range pythonShortLen {
+		v := b57dec[ps[i]]
+		if v == 0xff { //nolint:mnd // lob
 			return UUID{}, false
 		}
-		n.Mul(n, big57).Add(n, big.NewInt(i))
+		// (hi,lo) = (hi,lo)*57 + v
+		hh, hl := bits.Mul64(hi, fiftySeven)
+		lh, ll := bits.Mul64(lo, fiftySeven)
+		var c uint64
+		lo, c = bits.Add64(ll, uint64(v), 0)
+		hi, c = bits.Add64(hl, lh+c, 0) // lh <= 56, no carry from lh+c
+		if hh|c != 0 {
+			return UUID{}, false // 57^22 > 2^128: value does not fit a UUID
+		}
 	}
-	out := UUID{}
-	n.FillBytes(out.b[:])
+	var out UUID
+	binary.BigEndian.PutUint64(out.b[0:8], hi)
+	binary.BigEndian.PutUint64(out.b[8:16], lo)
 	return out, true
-}
-
-func pythonShortBase() [22]rune {
-	return [22]rune{
-		'2', '2', '2', '2', '2', // 5/22
-		'2', '2', '2', '2', '2', // 10/22
-		'2', '2', '2', '2', '2', // 15/22
-		'2', '2', '2', '2', '2', // 20/22
-		'2', '2', // 22/22
-	}
 }

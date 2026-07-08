@@ -3,7 +3,7 @@
 The wonderful libraries by Google and Gofrs have served us quite well, however, they have two fatal flaws. First, they
 use "Too Much Crypto" https://eprint.iacr.org/2019/1492.pdf. Second, ironically given the first, they can return errors.
 
-The idiom to wrap every `New` in a  `Log(err)` (responsible), or `Must` (optimistic), is verbose, inefficient, and
+The idiom to wrap every `New` in a `Log(err)` (responsible), or `Must` (optimistic), is verbose, inefficient, and
 possibly dangerous.
 
 This library is opinionated about what UUIDs are worthwhile (v4 and v7), how you should handle errors when parsing or
@@ -12,12 +12,13 @@ unmarshalling (sentinel), and even which compact serializations are useful (NCNa
 ## But the crypto!
 
 This library follows Go's `math/rand/v2` and Linux's `/dev/random` changes to use ChaCha20-based cryptographic
-pseudorandom number generators to ensure error-free generation and speed. UUIDs are not cryptographic keys or secrets.
+pseudorandom number generators to ensure error-free generation and speed. Randomness is drawn from `math/rand/v2`'s
+lock-free, per-CPU ChaCha8 generators, runtime-seeded from OS entropy. UUIDs are not cryptographic keys or secrets.
 
 ## But the errors!
 
-Errors returned from unmarshalling functions are anonymous, message-free sentinels. With no text to translate or
-sanitize they are functionally boolean: `nil` or not.
+Errors returned from unmarshalling functions are the constant sentinel `ErrInvalid`. With no dynamic content to
+translate or sanitize it is functionally boolean: `nil` or not.
 
 Boolean success and sentinel error returns free (require) you to handle parsing/unmarshalling failures your way.
 
@@ -25,7 +26,7 @@ Boolean success and sentinel error returns free (require) you to handle parsing/
 id, ok := uid.Parse(r.PathValue("id"))
 if !ok {
     // observe it your way
-    slog.Log("bad ID: %s", sanitizeForLog(input))
+    slog.Warn("bad ID", "id", sanitizeForLog(input))
     badIDCounter.Inc()
     // translate responses your way
     http.Error(w, messagePrinter.Sprint("invalid ID"), http.StatusBadRequest)
@@ -49,6 +50,32 @@ New Sortable UUID (v7 with "method 3" monotonicity and strict process-local uniq
 here if you need it.)
 ```go
 id := uid.NewV7Strict()
+```
+
+Strictness means each UUID gets a unique real-time slot (1/4096 ms). Due to maths, this makes the ceiling one UUID per
+~244ns (~4million/sec). On MacOS the clock granularity is ~1µs so benchmarks look bad compared to OSes with finer grain
+clocks.
+
+## Databases
+
+`UUID` implements `database/sql/driver.Valuer` and `database/sql.Scanner`, it drops straight into
+`database/sql` and `pgx` as `uuid` typed columns.
+
+```go
+_, err := db.Exec(`INSERT INTO widgets (id) VALUES ($1)`, uid.NewV7())
+
+var id uid.UUID
+err = db.QueryRow(`SELECT id FROM widgets WHERE ...`).Scan(&id)
+```
+
+### sqlc
+
+To use this type with `sqlc`, map `uuid` columns to `uid.UUID` with an override:
+
+```yaml
+overrides:
+  - db_type: "uuid"
+    go_type: "github.com/hoodie-ninja/uid.UUID"
 ```
 
 ## Short Serializations
