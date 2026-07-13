@@ -63,15 +63,15 @@ func TestSanity(t *testing.T) {
 	assert.NotEmpty(t, ts2)
 	assert.Exactly(t, ts1, ts2)
 	assert.Len(t, mss, 2) // breaking across ms should only have 2 different ms values
-	// test that times were generated in order (same-slot ids tie on time and interleave on random bits)
+	// check order
 	byTime := func(a, b uid.UUID) int { return a.Time().Compare(b.Time()) }
 	assert.True(t, slices.IsSortedFunc(ts1, byTime))
-	// test uuids are unique (includes randomness)
+	// check unique
 	assert.Len(t, ts1, len(slices.Compact(ts1)))
 }
 
 func TestTimeOverflow(t *testing.T) {
-	// v7 with unix_ts_ms beyond the int64 nanosecond range (year 2262+) must return zero time, not garbage
+	// v7 with unix_ts_ms beyond the int64 nanosecond range (year 2262+) return zero time.
 	id, ok := uid.Parse("ffffffff-ffff-7fff-bfff-ffffffffffff")
 	assert.True(t, ok)
 	assert.True(t, id.Time().IsZero())
@@ -97,8 +97,7 @@ func TestV7StrictIsV7(t *testing.T) {
 }
 
 func TestV7StrictAdjacentSlots(t *testing.T) {
-	// drive the clock one slot (~244ns) per call: consecutive ids land on adjacent slots, the regime where the
-	// former float slot math collapsed distinct slots into equal (ms, rand_a) pairs
+	// use one slot (~244ns) per call: consecutive ids land on adjacent slots.
 	defer uid.ResetV7Strict()
 	base := time.Now().Add(time.Hour).Truncate(time.Millisecond)
 	var calls atomic.Int64
@@ -116,9 +115,16 @@ func TestV7StrictAdjacentSlots(t *testing.T) {
 }
 
 func TestSanityBatching(t *testing.T) {
-	// create matching lists as fast as we can across 2ms to ensure capture 1 full ms
-	ts1, ts2 := []uid.UUID{}, []uid.UUID{}
-	for start := time.Now(); time.Since(start) < time.Millisecond; {
+	// use synthetic clock to deterministically cross exactly one ms boundary.
+	// Start 0.5ms into a ms then advance one ~244ns slot per call; 3000 calls span ~0.735ms -> exactly 2 vals.
+	defer uid.ResetV7Strict()
+	base := time.Now().Add(time.Hour).Truncate(time.Millisecond).Add(500 * time.Microsecond)
+	var calls atomic.Int64
+	defer uid.SetNowFunc(func() time.Time {
+		return base.Add(time.Duration(calls.Add(1)-1) * 245 * time.Nanosecond)
+	})()
+	ts1, ts2 := make([]uid.UUID, 0, 3000), make([]uid.UUID, 0, 3000)
+	for range 3000 {
 		id := uid.NewV7Strict()
 		ts1, ts2 = append(ts1, id), append(ts2, id) // fill both arrays instead of cloning later
 	}
@@ -135,10 +141,10 @@ func TestSanityBatching(t *testing.T) {
 	assert.NotEmpty(t, ts2)
 	assert.Exactly(t, ts1, ts2)
 	assert.Len(t, mss, 2) // breaking across ms should only have 2 different ms values
-	// test that times were generated in order
+	// check order
 	assert.True(t, slices.IsSortedFunc(ts1, uid.Compare))
-	// test uuids are unique (includes randomness)
+	// check uniqueness
 	assert.Len(t, ts1, len(slices.Compact(ts1)))
-	// assert times are strictly monotonic
+	// check strict monotonicity
 	assert.Len(t, ts1, len(ts))
 }
