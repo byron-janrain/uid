@@ -6,7 +6,7 @@ build: sec lint test
 .PHONY: update
 update:
 	rm -rf vendor
-	go get -u ./...
+	go get -u -t ./...
 	go mod tidy
 	go mod vendor
 
