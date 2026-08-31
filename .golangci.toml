@@ -9,16 +9,16 @@ max-same-issues = 0
 [linters]
 default = 'all'
 disable = [
-  'depguard',
-  'exhaustruct',
-  'forcetypeassert',
-  'gomodguard',
-  'nlreturn',
-  'noinlineerr',
-  'paralleltest',
-  'varnamelen',
-  'wsl',
-  'wsl_v5'
+	'depguard',     # not yet
+	'nlreturn',     # lolwut
+	'noinlineerr',  # lolwut
+	'paralleltest', # t.Parallel isn't what you think it is
+	'varnamelen',   # false positives on `id` and iteration/index vars
+	'wsl_v5',       # too aesthetic
+
+	'exhaustruct', # deprecated
+	'gomodguard',  # deprecated
+	'wsl',         # deprecated
 ]
 
 [linters.settings]
@@ -33,32 +33,22 @@ lines = -1
 require-explanation = true
 require-specific = true
 
+[linters.settings.exhaustruct_v5]
+allow-empty = true
+allow-empty-returns = true
+allow-empty-declarations = true
+
 [linters.exclusions]
 generated = 'strict'
-paths = [
-  'vendor',
-  'third_party$',
-  'builtin$',
-  'examples$'
-]
+paths = ['vendor']
 
 [formatters]
-enable = [
-  'gci',
-  'gofmt',
-  'gofumpt',
-  'goimports'
-]
+enable = ['gci', 'gofmt', 'gofumpt', 'goimports']
 
 [formatters.settings]
-[formatters.settings.gofumpt]
-extra-rules = true
+[formatters.settings.gofumpt.extra]
+group-params = true
 
 [formatters.exclusions]
 generated = 'lax'
-paths = [
-  'vendor',
-  'third_party$',
-  'builtin$',
-  'examples$'
-]
+paths = ['vendor']

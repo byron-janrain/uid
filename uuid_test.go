@@ -1,7 +1,9 @@
 package uid_test
 
 import (
+	"encoding"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -65,6 +67,52 @@ func TestBytesImmutable(t *testing.T) {
 	id := uid.Max()   // use max for non-zero values
 	id.Bytes()[0] = 0 // should be copy
 	assert.Exactly(t, id.Bytes(), uid.Max().Bytes())
+}
+
+// AppendText exists to satisfy encoding.TextAppender; nothing else pins its signature.
+var _ encoding.TextAppender = uid.UUID{}
+
+func TestAppendText(t *testing.T) {
+	id := uid.Max() // non-zero in every position
+
+	appended, err := id.AppendText(nil)
+	require.NoError(t, err)
+	assert.Exactly(t, uid.MaxCanonical, string(appended))
+
+	// a full slice forces append to move the backing array; the hex destinations must follow it
+	full := []byte("abc")
+	appended, err = id.AppendText(slices.Clip(full))
+	require.NoError(t, err)
+	assert.Exactly(t, "abc"+uid.MaxCanonical, string(appended))
+	assert.Exactly(t, "abc", string(full), "input must be untouched")
+
+	// the reuse idiom: one buffer, many UUIDs, no growth after the first
+	buf := make([]byte, 0, 64)
+	for _, id := range []uid.UUID{uid.Nil(), uid.Max(), uid.NewV4(), uid.NewV7()} {
+		buf, err = id.AppendText(buf[:0])
+		require.NoError(t, err)
+		assert.Exactly(t, id.String(), string(buf))
+	}
+}
+
+// textSink escapes anything stored in it, so AllocsPerRun below measures the returned buffer.
+//
+//nolint:gochecknoglobals // must outlive the closures to defeat escape analysis
+var textSink []byte
+
+func TestAppendTextAllocations(t *testing.T) {
+	id := uid.NewV4()
+
+	buf := make([]byte, 0, len(uid.NilCanonical))
+	assert.Zero(t, testing.AllocsPerRun(100, func() {
+		buf, _ = id.AppendText(buf[:0]) //nolint:errcheck // never errors
+	}), "AppendText into a buffer with room must not allocate")
+
+	// one buffer, retained: a String round-trip inside MarshalText would double this
+	allocs := testing.AllocsPerRun(100, func() {
+		textSink, _ = id.MarshalText() //nolint:errcheck // never errors
+	})
+	assert.InDelta(t, 1, allocs, 0)
 }
 
 func TestUnmarshalBinaryFail(t *testing.T) {

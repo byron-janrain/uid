@@ -5,7 +5,7 @@ import (
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
+	"slices"
 )
 
 // UUID is a UUID as defined by RFC...
@@ -41,20 +41,25 @@ func (u *UUID) UnmarshalBinary(b []byte) error {
 	return ErrInvalid
 }
 
+// canonLen is the length of the canonical representation.
+const canonLen = len(NilCanonical)
+
 // String implements fmt.Stringer. Returns canonical RFC-4122 representation.
 func (u UUID) String() string {
-	buf := make([]byte, 36) //nolint:mnd // lob
-	buf[8], buf[13], buf[18], buf[23] = '-', '-', '-', '-'
-	hex.Encode(buf[0:8], u.b[0:4])
-	hex.Encode(buf[9:13], u.b[4:6])
-	hex.Encode(buf[14:18], u.b[6:8])
-	hex.Encode(buf[19:23], u.b[8:10])
-	hex.Encode(buf[24:], u.b[10:])
-	return string(buf)
+	var buf [canonLen]byte // stack: encodeTo keeps no reference, so only the string below escapes
+	u.encodeTo(buf[:])
+	return string(buf[:])
 }
 
 // MarshalText implements encoding.TextMarshaler. Never returns errors.
-func (u UUID) MarshalText() ([]byte, error) { return []byte(u.String()), nil }
+func (u UUID) MarshalText() ([]byte, error) {
+	buf := make([]byte, canonLen)
+	u.encodeTo(buf)
+	return buf, nil
+}
+
+// AppendText implements encoding.TextAppender. Never returns errors.
+func (u UUID) AppendText(b []byte) ([]byte, error) { return u.appendText(b), nil }
 
 // UnmarshalText implements encoding.TextUnmarshaler. Returns ErrInvalid for malformed input.
 func (u *UUID) UnmarshalText(b []byte) error {
@@ -105,6 +110,36 @@ func Max() UUID { return UUID{bytesMax /*copy*/} }
 // IsMax returns true when u is the Max UUID.
 func (u UUID) IsMax() bool { return u.b == bytesMax }
 
+// b2h maps a byte to its two lowercase hex digits, the encoding counterpart of c2h.
+//
+//nolint:gochecknoglobals // lookup table
+var b2h = func() [256][2]byte {
+	const digits = "0123456789abcdef"
+	var t [256][2]byte
+	for i := range t {
+		t[i][0], t[i][1] = digits[i>>4], digits[i&0x0f]
+	}
+	return t
+}()
+
+// encodeTo writes u's canonical representation over the first canonLen bytes of buf. canonOffsets places each byte,
+// so the four dashes fall in the gaps it skips.
+func (u UUID) encodeTo(buf []byte) {
+	_ = buf[canonLen-1] // hoist the bounds check out of the loop
+	buf[8], buf[13], buf[18], buf[23] = '-', '-', '-', '-'
+	for i, x := range canonOffsets {
+		buf[x], buf[x+1] = b2h[u.b[i]][0], b2h[u.b[i]][1]
+	}
+}
+
+// appendText appends u's canonical representation to b. Grow-then-extend reserves the bytes encodeTo covers in full.
+func (u UUID) appendText(b []byte) []byte {
+	i := len(b)
+	b = slices.Grow(b, canonLen)[:i+canonLen]
+	u.encodeTo(b[i:]) // reslice after growing: growth may have moved the backing array
+	return b
+}
+
 //nolint:nonamedreturns,mnd // golf, locality of behavior
 func (u UUID) shifted() (out [16]byte) {
 	ints := [4]uint32{
@@ -121,7 +156,7 @@ func (u UUID) shifted() (out [16]byte) {
 	binary.BigEndian.PutUint32(out[4:8], ints[1])
 	binary.BigEndian.PutUint32(out[8:12], ints[2])
 	binary.BigEndian.PutUint32(out[12:16], ints[3])
-	return //nolint:gofumpt // covered by nonamedreturns
+	return
 }
 
 // Compare implements slices.SortFunc for the UUID type. v7 UUIDs sort by embedded time (unix_ts_ms and rand_a);
