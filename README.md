@@ -1,13 +1,11 @@
 # Yet another UUID library!?
 
-The wonderful libraries by Google and Gofrs have served us quite well, however, they have two fatal flaws. First, they
-use "Too Much Crypto" https://eprint.iacr.org/2019/1492.pdf. Second, ironically given the first, they can return errors.
+This library exists to free UUIDs from "Too Much Crypto" https://eprint.iacr.org/2019/1492.pdf and enhance usage across
+the many places where UUIDs are commonly found (JSON, SQL, etc).
 
-The idiom to wrap every `New` in a `Log(err)` (responsible), or `Must` (optimistic), is verbose, inefficient, and
-possibly dangerous.
-
-This library is opinionated about what UUIDs are worthwhile (v4 and v7), how you should handle errors when parsing or
-unmarshalling (sentinel), and even which compact serializations are useful (NCName).
+This library agrees with stdlib's opionion about what UUIDs are worthwhile (v4 and v7), and that creating UUIDs should
+never fail (no constructor errors). However, even the standard library returns useless parse errors as sentinels where
+simple `false` would force developers to actuall handle instead of relay the sentinel.
 
 ## But the crypto!
 
@@ -116,3 +114,13 @@ following helpers
 (22).
 
 `ToPythonShort` encodes a given `UUID` into a Python ShortUUID using the default alphabet (Base57) and padding (22).
+
+# What about `uuid`? #
+
+This library was originally written to remove the penalties of crypto/rand costs to non-cryptographic ID generation and
+the ergonomics of fallible constructors. Now that uuid has been added to Go (1.27) the constructor issue is solved, but
+the implementors still leaned on the "too much crypto" solution. Moreover, the purely sentinel error that standard lib
+Parse returns is unexported so callers cannot errors.Is against it even if they did want it.
+
+This library will continue to provide an opinionated parser and a richer data-type tool. But adopt the core type so
+importers can easily jump between the two.
